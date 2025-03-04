@@ -16,14 +16,21 @@
 # The ` registry.access.redhat.com/ubi9/ubi-minimal:9.5` base image is based on UBI 9.
 # To use UBI 8, switch to `quay.io/ubi8/ubi-minimal:8.10`.
 ###
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
-WORKDIR /work/
-RUN chown 1001 /work \
-    && chmod "g+rwX" /work \
-    && chown 1001:root /work
-COPY --chown=1001:root --chmod=0755 target/*-runner /work/application
+# Use AWS Lambda provided base image for native applications
+FROM public.ecr.aws/lambda/provided:al2
+
+# Set working directory
+WORKDIR /var/task
+
+# Copy the Quarkus native executable and rename it to 'bootstrap'
+COPY target/*-runner bootstrap
+
+# Ensure the file has execution permissions
+RUN chmod +x /var/task/bootstrap
+
+# Lambda entrypoint (AWS Lambda expects 'bootstrap' as the executable)
+CMD ["bootstrap"]
+
 
 EXPOSE 8080
 USER 1001
-
-ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0"]

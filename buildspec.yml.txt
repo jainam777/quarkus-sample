@@ -1,0 +1,37 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: "ap-south-1"
+    ECR_REPO: "wep-quarkus"
+    IMAGE_TAG: "latest"
+    FUNCTION_NAME: "wep-quarkus-lambda"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 191170441096.dkr.ecr.$AWS_REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo "Building the project using Maven..."
+      - mvn clean package -Pnative -Dquarkus.native.container-build=true
+
+      - echo "Building the Docker image..."
+      - docker build --platform=linux/amd64 --tag $ECR_REPO:$IMAGE_TAG -f src/main/docker/Dockerfile.native .
+
+      - echo "Tagging the image..."
+      - docker tag $ECR_REPO:$IMAGE_TAG 191170441096.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo "Pushing the Docker image to Amazon ECR..."
+      - docker push 191170441096.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+
+      - echo "Updating AWS Lambda function..."
+      - aws lambda update-function-code --function-name $FUNCTION_NAME --image-uri 191170441096.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+
+artifacts:
+  files: []
+  discard-paths: yes
